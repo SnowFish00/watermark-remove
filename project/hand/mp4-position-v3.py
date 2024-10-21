@@ -54,7 +54,7 @@ def get_10th_frame(video_path):
 # 播放视频并调用delogo
 
 
-def deal_video_with_delogo(video_path, x, y, w, h):
+def deal_video_with_delogo(video_path, x, y, w, h, output_path):
     # 构建FFmpeg命令
     command = [
         'ffmpeg',
@@ -114,7 +114,11 @@ if __name__ == '__main__':
                         break
 
                 if rect_params:
-                    tasks.append((video, rect_params, output_path_base))
+                    # rect_params 应该是一个包含四个值的元组 (left, top, width, height)
+                    left, top, width, height = rect_params
+                    # 添加所有必需的参数到任务列表
+                    tasks.append(
+                        (video, left, top, width, height, output_path))
 
         # 并发执行任务
         pool.starmap(deal_video_with_delogo, tasks)
