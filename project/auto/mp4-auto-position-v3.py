@@ -3,6 +3,7 @@ import numpy as np
 import subprocess
 import os
 from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
 
 
 def find_watermark_position(video_frame, watermark_image, scale_factor):
@@ -88,6 +89,11 @@ def process_video_with_logos(video, logos):
         preview_remove_watermark(video, logo)
 
 
+# 定义一个更新进度条的回调函数
+def update_progress(future):
+    progress_bar.update(1)
+
+
 # 并发处理
 output_path_base = '/Users/snowfish/Desktop/demo/resource/outList/'
 
@@ -105,10 +111,20 @@ print(video_files_paths)
 
 # 使用ThreadPoolExecutor并发处理
 with ThreadPoolExecutor() as executor:
+    # 创建一个进度条，长度等于视频文件的数量
+    progress_bar = tqdm(total=len(video_files_paths), desc="Processing Videos")
+
     # 将视频与水印文件传入线程池进行并发处理
     futures = [executor.submit(
         process_video_with_logos, video, logo_files_paths) for video in video_files_paths]
 
+    # 为每个future添加回调，当任务完成时更新进度条
+    for future in futures:
+        future.add_done_callback(update_progress)
+
     # 等待所有任务完成
     for future in futures:
         future.result()
+
+     # 关闭进度条
+    progress_bar.close()
