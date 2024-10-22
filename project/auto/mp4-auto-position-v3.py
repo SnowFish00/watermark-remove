@@ -1,8 +1,8 @@
-from concurrent.futures import ThreadPoolExecutor
 import cv2
 import numpy as np
 import subprocess
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 
 def find_watermark_position(video_frame, watermark_image, scale_factor):
@@ -27,6 +27,10 @@ def find_watermark_position(video_frame, watermark_image, scale_factor):
 
 def preview_remove_watermark(video_path, watermark_image_path):
     # 判断是否视频重复
+    video_name = os.path.basename(video_path)
+    logo_name = os.path.basename(watermark_image_path)
+    output_path = f'/Users/snowfish/Desktop/demo/resource/outList/{video_name}'
+
     if os.path.exists(output_path):
         print(f"输出文件已存在，跳过处理: {video_name}")
         return
@@ -37,7 +41,7 @@ def preview_remove_watermark(video_path, watermark_image_path):
     watermark_image = cv2.imread(watermark_image_path)
 
     if not ret:
-        print("无法读取视频帧")
+        print(f"无法读取视频帧: {video_name}")
         return
 
     best_scale = None
@@ -62,7 +66,7 @@ def preview_remove_watermark(video_path, watermark_image_path):
         x, y = best_position
         w, h = best_size
 
-        # 使用ffplay delogo滤镜实时预览去除水印
+        # 使用ffmpeg delogo滤镜实时预览去除水印
         ffmpeg_command = [
             'ffmpeg',
             '-i', video_path,  # 指定输入视频文件路径
@@ -73,125 +77,38 @@ def preview_remove_watermark(video_path, watermark_image_path):
         ]
 
         # 执行命令
-        print(f"当前视频{video_name}匹配水印{logo_name}")
+        print(f"当前视频 {video_name} 匹配水印 {logo_name}")
         subprocess.run(ffmpeg_command)
     else:
-        print(f"当前视频{video_name}未找到水印{logo_name}")
+        print(f"当前视频 {video_name} 未找到水印 {logo_name}")
 
 
-# 示例用法
-output_path_base = '/Users/snowfish/Desktop/demo/resource/outList/'
-
-# 列表
-directory_logo_path = '/Users/snowfish/Desktop/demo/resource/logo'
-# 存储PNG文件绝对路径的列表
-logo_files_paths = []
-# 遍历目录中的所有文件
-for filename in os.listdir(directory_logo_path):
-    # 检查文件是否为PNG图片
-    if filename.lower().endswith('.png'):
-        # 构造绝对路径并添加到列表中
-        absolute_logo_path = os.path.join(directory_logo_path, filename)
-        logo_files_paths.append(absolute_logo_path)
-
-# 打印获取到的PNG文件路径列表
-print(logo_files_paths)
-
-directory_video_path = '/Users/snowfish/Desktop/demo/resource/mp4List'
-# 存储video文件绝对路径的列表
-video_files_paths = []
-# 遍历目录中的所有文件
-for filename in os.listdir(directory_video_path):
-    # 检查文件是否为video图片
-    if filename.lower().endswith('.mp4'):
-        # 构造绝对路径并添加到列表中
-        absolute_video_path = os.path.join(directory_video_path, filename)
-        video_files_paths.append(absolute_video_path)
-
-# 打印获取到的PNG文件路径列表
-print(video_files_paths)
-
-for video in video_files_paths:
-    video_name = video.split("/")[-1]
-    output_path = '/Users/snowfish/Desktop/demo/resource/outList/'+video_name
-    for logo in logo_files_paths:
-        logo_name = logo.split("/")[-1]
+def process_video_with_logos(video, logos):
+    for logo in logos:
         preview_remove_watermark(video, logo)
 
 
-def find_watermark_position(video_frame, watermark_image, scale_factor):
-    watermark_resized = cv2.resize(
-        watermark_image, (0, 0), fx=scale_factor, fy=scale_factor)
-    frame_gray = cv2.cvtColor(video_frame, cv2.COLOR_BGR2GRAY)
-    watermark_gray = cv2.cvtColor(watermark_resized, cv2.COLOR_BGR2GRAY)
-    result = cv2.matchTemplate(
-        frame_gray, watermark_gray, cv2.TM_CCOEFF_NORMED)
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-    return max_val, max_loc, watermark_resized.shape[1], watermark_resized.shape[0]
+# 并发处理
+output_path_base = '/Users/snowfish/Desktop/demo/resource/outList/'
 
+# 获取logo文件列表
+directory_logo_path = '/Users/snowfish/Desktop/demo/resource/logo'
+logo_files_paths = [os.path.join(directory_logo_path, f) for f in os.listdir(
+    directory_logo_path) if f.lower().endswith('.png')]
+print(logo_files_paths)
 
-def preview_remove_watermark(video_path, watermark_image_path):
-    cap = cv2.VideoCapture(video_path)
-    ret, frame = cap.read()
-    watermark_image = cv2.imread(watermark_image_path)
-    if not ret:
-        print("无法读取视频帧")
-        return
+# 获取视频文件列表
+directory_video_path = '/Users/snowfish/Desktop/demo/resource/mp4List'
+video_files_paths = [os.path.join(directory_video_path, f) for f in os.listdir(
+    directory_video_path) if f.lower().endswith('.mp4')]
+print(video_files_paths)
 
-    best_scale = None
-    best_val = 0.6
-    best_position = None
-    best_size = (0, 0)
+# 使用ThreadPoolExecutor并发处理
+with ThreadPoolExecutor() as executor:
+    # 将视频与水印文件传入线程池进行并发处理
+    futures = [executor.submit(
+        process_video_with_logos, video, logo_files_paths) for video in video_files_paths]
 
-    scale_factors = np.arange(0.05, 1.0, 0.01)
-    for scale_factor in scale_factors:
-        max_val, position, w, h = find_watermark_position(
-            frame, watermark_image, scale_factor)
-        if max_val > best_val:
-            best_val = max_val
-            best_scale = scale_factor
-            best_position = position
-            best_size = (w, h)
-
-    if best_position is not None:
-        x, y = best_position
-        w, h = best_size
-        output_path = video_path.replace('.mp4', '_no_watermark.mp4')
-        ffmpeg_command = [
-            'ffmpeg', '-i', video_path, '-vf', f'delogo=x={x}:y={y}:w={
-                w}:h={h}', '-c:v', 'libx264', '-c:a', 'aac', output_path
-        ]
-        print(f"当前视频{os.path.basename(video_path)}匹配水印{
-              os.path.basename(watermark_image_path)}")
-        subprocess.run(ffmpeg_command)
-    else:
-        print(f"当前视频{os.path.basename(video_path)}未找到水印{
-              os.path.basename(watermark_image_path)}")
-
-
-def process_video(video_path, logo_path):
-    if os.path.exists(video_path):
-        print(f"输出文件已存在，跳过处理: {os.path.basename(video_path)}")
-        return
-    preview_remove_watermark(video_path, logo_path)
-
-
-def main_concurrent(video_files_paths, logo_files_paths):
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        for video_path in video_files_paths:
-            for logo_path in logo_files_paths:
-                executor.submit(process_video, video_path, logo_path)
-    executor.shutdown(wait=True)  # 确保所有线程完成
-
-
-if __name__ == "__main__":
-    output_path_base = '/Users/snowfish/Desktop/demo/resource/outList/'
-    directory_logo_path = '/Users/snowfish/Desktop/demo/resource/logo'
-    logo_files_paths = [os.path.join(directory_logo_path, f) for f in os.listdir(
-        directory_logo_path) if f.lower().endswith('.png')]
-
-    directory_video_path = '/Users/snowfish/Desktop/demo/resource/mp4List'
-    video_files_paths = [os.path.join(directory_video_path, f) for f in os.listdir(
-        directory_video_path) if f.lower().endswith('.mp4')]
-
-    main_concurrent(video_files_paths, logo_files_paths)
+    # 等待所有任务完成
+    for future in futures:
+        future.result()
