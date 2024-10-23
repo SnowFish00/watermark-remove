@@ -17,13 +17,9 @@ progress_lock = threading.Lock()
 
 def remove_watermark(video_path, output_dir, watermark_param):
     video_name = os.path.basename(video_path)
-    # 添加 -processing 后缀到输出文件名
-    output_path = os.path.join(
-        output_dir, video_name.replace('.mp4', '-processing.mp4'))
+    output_path = os.path.join(output_dir, video_name)
 
-   # 检查输出目录中是否存在同名文件或以 -processing 结尾的文件
-    existing_files = os.listdir(output_dir)
-    if video_name in existing_files or video_name.replace('.mp4', '-processing.mp4') in existing_files:
+    if os.path.exists(output_path):
         print(f"输出文件已存在，跳过处理: {video_name}")
         return
 
@@ -39,11 +35,8 @@ def remove_watermark(video_path, output_dir, watermark_param):
 
     print(f"正在处理视频: {video_name}")
     try:
-        # 使用 subprocess.run 进行处理
+        # 使用 subprocess.run 而不是 subprocess.Popen，以便异步处理
         subprocess.run(ffmpeg_command, check=True)
-        # 处理完成后重命名文件，去掉 -processing 后缀
-        final_output_path = os.path.join(output_dir, video_name)
-        os.rename(output_path, final_output_path)
     except subprocess.CalledProcessError as e:
         print(f"处理视频 {video_name} 时出错: {e}")
     return video_name
