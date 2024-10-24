@@ -7,7 +7,7 @@ import (
 
 func main() {
 	// 定义要执行的命令
-	cmd := exec.Command("python3", "../project/auto/mp4-auto-position-v3.py")
+	cmd := exec.Command("python3", "../project/sort-half-auto/v4.py")
 
 	// 获取命令的标准输出和标准错误输出
 	output, err := cmd.CombinedOutput()

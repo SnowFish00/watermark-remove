@@ -75,8 +75,7 @@ def monitor_directory(video_dir, output_dir, processing_set, queue):
             folder_path = os.path.join(video_dir, folder_name)
             if os.path.isdir(folder_path):
                 for video_file in os.listdir(folder_path):
-                    # 检查文件是否为.mp4格式且不以-processing结尾，并且文件未被处理过
-                    if video_file.lower().endswith('.mp4') and '-processing' not in video_file.lower() and video_file not in processed_files:
+                    if video_file.lower().endswith('.mp4') and video_file not in processed_files:
                         video_file_path = os.path.join(folder_path, video_file)
 
                         # 检查文件是否传输完成（循环检测）
