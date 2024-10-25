@@ -14,9 +14,6 @@ watermark_params = {
     'C': {'x': 1023, 'y': 17, 'w': 205, 'h': 62}
 }
 
-# 创建一个全局锁，用于确保进度条更新的线程安全
-progress_lock = threading.Lock()
-
 
 def remove_watermark(video_path, output_dir, watermark_param, processing_set):
     video_name = os.path.basename(video_path)
@@ -41,7 +38,11 @@ def remove_watermark(video_path, output_dir, watermark_param, processing_set):
     ]
 
     print(f"正在处理视频: {video_name}")
-    processing_set.add(video_name)
+    with processing_lock:
+        if video_name in processing_set:
+            print(f"视频文件 {video_name} 正在处理中，跳过")
+            return
+        processing_set.add(video_name)
     try:
         # 使用 subprocess.run 进行处理
         subprocess.run(ffmpeg_command, check=True)
@@ -51,7 +52,9 @@ def remove_watermark(video_path, output_dir, watermark_param, processing_set):
     except subprocess.CalledProcessError as e:
         print(f"处理视频 {video_name} 时出错: {e}")
     finally:
-        processing_set.remove(video_name)
+        # 确保处理结束后，从 processing_set 中移除
+        with processing_lock:
+            processing_set.remove(video_name)
 
 
 def is_file_completed(filepath, check_interval=0.1):
@@ -151,7 +154,7 @@ def main_concurrent(video_dir, output_dir):
 if __name__ == '__main__':
     video_base_dir = '/Users/snowfish/Desktop/demo/resource/mp4-sort/'
     output_base_dir = '/Users/snowfish/Desktop/demo/resource/mp4-sort-out/'
-
+    processing_lock = threading.Lock()
     # 创建输出目录
     os.makedirs(output_base_dir, exist_ok=True)
 
